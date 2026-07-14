@@ -15,6 +15,8 @@ DB_PATH = Path(__file__).parent / "deskmind.db"
 IDLE_TIMEOUT = 60  # 超过 60 秒无鼠标/键盘活动 = idle
 TRACK_INTERVAL = 5  # 每 5 秒采集一次窗口信息
 
+from classifier import classify as ai_classify
+
 
 # ============ 事件计数器（线程安全） ============
 
@@ -255,7 +257,7 @@ def categorize_app(process_name, window_title):
 def log_activity():
     """采集一次完整的行为快照"""
     process_name, window_title = get_active_window()
-    category = categorize_app(process_name, window_title)
+    category = ai_classify(process_name, window_title, rule_based_fallback=categorize_app)
     is_idle = counter.is_idle
     keys, clicks, moves, idle_secs = counter.snapshot_and_reset()
     timestamp = datetime.now().isoformat()

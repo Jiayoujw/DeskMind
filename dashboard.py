@@ -11,6 +11,7 @@ from collections import Counter, defaultdict
 from flask import Flask, render_template_string, jsonify, request
 
 from analyzer import compute_stats, analyze_today, get_date_range_activity
+from export import export_json, export_csv
 
 app = Flask(__name__, static_folder=str(Path(__file__).parent / "static"))
 DB_PATH = Path(__file__).parent / "deskmind.db"
@@ -81,6 +82,11 @@ HTML_TEMPLATE = r"""
   .idle-tag { display: inline-block; background: #ff980022; color: #ff9800; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
   .focus-tag { display: inline-block; background: #00bcd422; color: #00bcd4; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
   .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+  .report-card { background: #16213e; border-radius: 8px; padding: 14px; margin-bottom: 10px; border-left: 3px solid #7c8cf8; }
+  .report-card .date { font-size: 13px; color: #7c8cf8; font-weight: 600; }
+  .report-card .stats { font-size: 12px; color: #888; margin-top: 4px; }
+  .report-card .ai-summary { font-size: 13px; color: #bbb; margin-top: 6px; line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -178,6 +184,27 @@ HTML_TEMPLATE = r"""
       </div>
       <div id="ai-result" class="ai-content" style="display:none;"></div>
       <div id="ai-loading" class="loading" style="display:none;">AI 正在多维度分析你的行为数据</div>
+    </div>
+
+    <!-- 周趋势 -->
+    <div class="card full-width">
+      <h2><span class="icon">&#128200;</span> 7 天趋势</h2>
+      <canvas id="weekly-trend-chart" height="180"></canvas>
+    </div>
+
+    <!-- 历史报告 -->
+    <div class="card full-width">
+      <h2><span class="icon">&#128197;</span> 历史报告</h2>
+      <div id="history-reports" style="font-size:14px; color:#888;">加载中...</div>
+    </div>
+
+    <!-- 底部工具栏 -->
+    <div class="card full-width" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div style="display:flex; gap:10px; align-items:center;">
+        <button class="btn" onclick="exportData('json')" style="background:#4caf50;">导出 JSON</button>
+        <button class="btn" onclick="exportData('csv')" style="background:#ff9800;">导出 CSV</button>
+      </div>
+      <div id="classifier-status" style="font-size:12px; color:#888;">分类器状态加载中...</div>
     </div>
   </div>
 
@@ -414,6 +441,103 @@ async function runAnalysis() {
   btn.disabled = false;
   btn.textContent = '重新分析';
 }
+
+// 7 天趋势
+async function loadWeeklyTrend() {
+  try {
+    const resp = await fetch('/api/weekly-trend');
+    const data = await resp.json();
+    if (data.error) { return; }
+    renderWeeklyTrend(data);
+  } catch(e) {}
+}
+
+let weeklyTrendChart = null;
+function renderWeeklyTrend(data) {
+  const labels = data.dates.map(d => d.slice(5)); // MM-DD
+  const ctx = document.getElementById('weekly-trend-chart').getContext('2d');
+  if (weeklyTrendChart) weeklyTrendChart.destroy();
+  weeklyTrendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: '活跃(分钟)', data: data.active_minutes, borderColor: '#4caf50', backgroundColor: 'rgba(76,175,80,0.1)', fill: true, tension: 0.3, pointRadius: 3 },
+        { label: '按键强度(次/分)', data: data.kpm, borderColor: '#e91e63', backgroundColor: 'rgba(233,30,99,0.1)', fill: false, tension: 0.3, pointRadius: 3, yAxisID: 'y1' }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { color: '#ccc', font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: '#888' }, grid: { color: '#2a2a4a' } },
+        y: { type: 'linear', position: 'left', ticks: { color: '#4caf50' }, grid: { color: '#2a2a4a' }, title: { display: true, text: '分钟', color: '#4caf50' } },
+        y1: { type: 'linear', position: 'right', ticks: { color: '#e91e63' }, grid: { drawOnChartArea: false }, title: { display: true, text: '次/分', color: '#e91e63' } }
+      }
+    }
+  });
+}
+
+// 历史报告
+async function loadHistoryReports() {
+  try {
+    const resp = await fetch('/api/reports');
+    const data = await resp.json();
+    const container = document.getElementById('history-reports');
+    if (!data.length) {
+      container.innerHTML = '<div style="color:#666;">暂无历史报告。运行 <code>python reporter.py today</code> 生成第一份报告。</div>';
+      return;
+    }
+    container.innerHTML = data.map(r => {
+      const aiText = (r.ai_analysis || '无 AI 分析').substring(0, 200);
+      return '<div class="report-card">' +
+        '<div class="date">' + r.date + '</div>' +
+        '<div class="stats">活跃 ' + (r.total_active_minutes || 0) + ' 分钟 | 空闲 ' + (r.total_idle_minutes || 0) + ' 分钟 | 按键 ' + (r.total_key_strokes || 0) + ' 次</div>' +
+        '<div class="ai-summary">' + aiText.replace(/\n/g, '<br>') + '...</div>' +
+        '</div>';
+    }).join('');
+  } catch(e) {
+    document.getElementById('history-reports').innerHTML = '<div style="color:#666;">加载失败</div>';
+  }
+}
+
+// 数据导出
+async function exportData(format) {
+  try {
+    const resp = await fetch('/api/export?format=' + format + '&days=7');
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'deskmind_export_7d.' + format;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    alert('导出失败: ' + e.message);
+  }
+}
+
+// 分类器状态
+async function loadClassifierStatus() {
+  try {
+    const resp = await fetch('/api/classifier-status');
+    const data = await resp.json();
+    const el = document.getElementById('classifier-status');
+    const aiLabel = data.ollama_available
+      ? '<span style="color:#4caf50;">AI 分类已启用</span>'
+      : '<span style="color:#ff9800;">AI 离线，使用规则分类</span>';
+    el.innerHTML = aiLabel + ' | 缓存: ' + data.total_cached + ' 条 | ' +
+      Object.entries(data.by_category || {}).map(([k,v]) => k + ':' + v).join(' ');
+  } catch(e) {}
+}
+
+// 页面加载时也请求这些数据
+document.addEventListener('DOMContentLoaded', () => {
+  loadWeeklyTrend();
+  loadHistoryReports();
+  loadClassifierStatus();
+});
 </script>
 </body>
 </html>
@@ -456,6 +580,85 @@ def api_models():
             return jsonify({"models": models})
     except:
         return jsonify({"models": [], "error": "Ollama 未启动"})
+
+
+@app.route("/api/weekly-trend")
+def api_weekly_trend():
+    """返回最近 7 天的每日活跃时间趋势"""
+    try:
+        from analyzer import get_date_range_activity
+        records = get_date_range_activity(7)
+        
+        # 按天分组统计
+        daily = defaultdict(lambda: {"active": 0, "idle": 0, "keys": 0, "clicks": 0, "active_count": 0})
+        for r in records:
+            date = r["timestamp"][:10]
+            if r.get("is_idle", 0):
+                daily[date]["idle"] += 5
+            else:
+                daily[date]["active"] += 5
+                daily[date]["active_count"] += 1
+                daily[date]["keys"] += r.get("key_count", 0)
+                daily[date]["clicks"] += r.get("click_count", 0)
+        
+        # 生成连续 7 天的数据
+        dates = []
+        active_minutes = []
+        kpm = []
+        for i in range(6, -1, -1):
+            d = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+            dates.append(d)
+            data = daily[d]
+            active_minutes.append(round(data["active"] / 60, 1))
+            active_mins = data["active"] / 60 or 1
+            kpm.append(round(data["keys"] / active_mins, 1))
+        
+        return jsonify({
+            "dates": dates,
+            "active_minutes": active_minutes,
+            "kpm": kpm,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
+@app.route("/api/reports")
+def api_reports():
+    """返回历史日报列表"""
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT date, total_active_minutes, total_idle_minutes, total_key_strokes, total_clicks, ai_analysis FROM daily_summary ORDER BY date DESC LIMIT 14"
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/export")
+def api_export():
+    """数据导出 API"""
+    from flask import Response
+    fmt = request.args.get("format", "json")
+    days = int(request.args.get("days", 7))
+    
+    if fmt == "csv":
+        content = export_csv(days)
+        return Response(content, mimetype="text/csv",
+                        headers={"Content-Disposition": "attachment; filename=deskmind_export.csv"})
+    else:
+        content = export_json(days)
+        return Response(content, mimetype="application/json",
+                        headers={"Content-Disposition": "attachment; filename=deskmind_export.json"})
+
+
+@app.route("/api/classifier-status")
+def api_classifier_status():
+    """返回 AI 分类器状态"""
+    try:
+        from classifier import get_cache_stats
+        return jsonify(get_cache_stats())
+    except:
+        return jsonify({"total_cached": 0, "by_category": {}, "ollama_available": False})
 
 
 # ============ 启动 ============
