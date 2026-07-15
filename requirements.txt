@@ -2,3 +2,4 @@ flask>=2.3
 psutil>=5.9
 pywin32>=306
 pynput>=1.7
+pystray>=0.19

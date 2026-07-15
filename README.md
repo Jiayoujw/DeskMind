@@ -59,17 +59,25 @@ pip install -r requirements.txt
 
 ### Run
 
-**Terminal 1 — Start tracking:**
+**One command to start everything** (tracker + dashboard + alerter + system tray):
 ```bash
-python tracker.py
+python start.py
 ```
 
-**Terminal 2 — Start dashboard:**
+Or without system tray (runs tracker in foreground):
 ```bash
-python dashboard.py
+python start.py --no-tray
 ```
 
-Open http://localhost:5000 in your browser.
+Open http://localhost:5000 in your browser. Double-click the tray icon to open the dashboard.
+
+### Smart Distraction Alerts
+
+When you spend too long on non-productive apps (video > 5min, social > 15min), DeskMind sends a Windows Toast notification. Fully automatic, no configuration needed.
+
+### AI Auto-Classification
+
+Activities are automatically classified by a local AI model (Ollama) — no manual regex rules required. Falls back to rule-based classification if Ollama is offline.
 
 ### Reports
 
@@ -83,18 +91,35 @@ python reporter.py
 # Generate weekly report
 python reporter.py week
 
-# Start auto-schedule mode (generates report daily at 23:55)
+# Auto-schedule: generates report daily at 23:55
 python reporter.py schedule
 ```
+
+### Data Export
+
+```bash
+# Export 7 days as JSON
+python export.py --days=7 json
+
+# Export 30 days as CSV
+python export.py --days=30 csv
+```
+
+Or use the export buttons on the web dashboard.
 
 ## Project Structure
 
 ```
 DeskMind/
-├── tracker.py        # Multi-dimensional behavior tracker (pynput hooks + window monitoring)
+├── start.py          # One-command launcher (auto-deps, tray mode)
+├── tray_app.py       # System tray controller (start/stop services)
+├── tracker.py        # Multi-dimensional tracker (pynput + AI classification)
+├── classifier.py     # AI auto-classification with cache + fallback
 ├── analyzer.py       # Statistics engine + AI analysis (Ollama)
 ├── reporter.py       # Daily/weekly report generation + scheduler
+├── alerter.py        # Smart distraction alerts (context-aware)
 ├── dashboard.py      # Flask web dashboard (Chart.js)
+├── export.py         # JSON/CSV data export
 ├── requirements.txt  # Python dependencies
 └── .gitignore
 ```
@@ -135,14 +160,16 @@ DeskMind/
 
 ## Roadmap
 
-- [ ] AI auto-classification (replace rule-based categorization)
-- [ ] Smart distraction alerts (context-aware, not just timers)
-- [ ] Weekly trend charts in dashboard
+- [x] AI auto-classification (replace rule-based categorization)
+- [x] Smart distraction alerts (context-aware, not just timers)
+- [x] Weekly trend charts in dashboard
+- [x] System tray app with one-click start/stop
+- [x] Data export (JSON/CSV)
+- [x] Daily/weekly AI reports with scheduling
 - [ ] Browser extension for URL-level tracking
 - [ ] macOS/Linux support
-- [ ] System tray app with one-click start/stop
-- [ ] Data export (JSON/CSV)
 - [ ] Pomodoro integration based on focus detection
+- [ ] Configurable alert thresholds via dashboard UI
 
 ## Inspiration
 
