@@ -25,83 +25,288 @@ HTML_TEMPLATE = r"""
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DeskMind v2 - 多维度电脑行为分析</title>
+<title>DeskMind — 认知驾驶舱</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
+  :root {
+    --bg-primary: #080b1a;
+    --bg-card: #0f1328;
+    --bg-card-hover: #141933;
+    --border-subtle: rgba(59,130,246,0.12);
+    --border-glow: rgba(59,130,246,0.3);
+    --accent-blue: #3b82f6;
+    --accent-pink: #f472b6;
+    --accent-emerald: #34d399;
+    --accent-amber: #f59e0b;
+    --accent-coral: #fb7185;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #475569;
+    --radius: 14px;
+    --font-display: 'Bricolage Grotesque', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; }
-  .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 20px 30px; border-bottom: 1px solid #2a2a4a; display: flex; justify-content: space-between; align-items: center; }
-  .header h1 { font-size: 24px; color: #7c8cf8; }
-  .header p { color: #888; font-size: 14px; margin-top: 4px; }
-  .header .version { background: #7c8cf822; color: #7c8cf8; padding: 4px 10px; border-radius: 12px; font-size: 12px; border: 1px solid #7c8cf844; }
-  .container { max-width: 1300px; margin: 0 auto; padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  .card { background: #1a1a2e; border-radius: 12px; padding: 20px; border: 1px solid #2a2a4a; }
-  .card h2 { font-size: 15px; color: #7c8cf8; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
-  .card h2 .icon { font-size: 18px; }
+  body {
+    font-family: var(--font-display);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse at 20% 20%, rgba(59,130,246,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(244,114,182,0.05) 0%, transparent 50%),
+      linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+    background-position: 0 0, 0 0, -1px -1px, -1px -1px;
+  }
 
-  /* 统计卡片 */
-  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; grid-column: 1 / -1; }
-  .stat-item { background: #16213e; border-radius: 10px; padding: 18px 14px; text-align: center; position: relative; overflow: hidden; }
-  .stat-item::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent, #7c8cf8); }
-  .stat-item .value { font-size: 26px; font-weight: 700; color: var(--accent, #7c8cf8); margin-top: 4px; }
-  .stat-item .label { font-size: 12px; color: #888; margin-top: 4px; }
-  .stat-item .sub { font-size: 11px; color: #666; margin-top: 2px; }
-  .stat-item.active-rate { --accent: #4caf50; }
-  .stat-item.idle-time { --accent: #ff9800; }
-  .stat-item.key-intensity { --accent: #e91e63; }
-  .stat-item.focus-hours { --accent: #00bcd4; }
+  /* ===== 头部 ===== */
+  .header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(8,11,26,0.85);
+    backdrop-filter: blur(20px) saturate(1.5);
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 16px 32px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .header-brand { display: flex; align-items: center; gap: 14px; }
+  .header-logo {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-pink));
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-weight: 700; font-size: 18px;
+    color: #fff; box-shadow: 0 0 20px rgba(59,130,246,0.3);
+  }
+  .header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+  .header h1 span { color: var(--accent-pink); }
+  .header p { font-size: 12px; color: var(--text-secondary); margin-top: 1px; }
+  .header-badge {
+    font-family: var(--font-mono); font-size: 11px; padding: 4px 12px;
+    border-radius: 20px; background: rgba(59,130,246,0.1);
+    border: 1px solid var(--border-subtle); color: var(--accent-blue);
+  }
 
-  /* 第二行统计 */
-  .stat-grid-2 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; grid-column: 1 / -1; }
-  .stat-grid-2 .stat-item { --accent: #7c8cf8; }
-
+  /* ===== 容器 ===== */
+  .container {
+    max-width: 1360px; margin: 0 auto; padding: 24px 32px 48px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+  }
   .full-width { grid-column: 1 / -1; }
-  .ai-section { grid-column: 1 / -1; background: linear-gradient(135deg, #1a1a2e 0%, #0d1b2a 100%); }
-  .ai-content { white-space: pre-wrap; line-height: 1.8; font-size: 14px; color: #ccc; max-height: 500px; overflow-y: auto; }
-  .ai-content h3 { color: #7c8cf8; margin: 12px 0 4px; }
-  .ai-content strong { color: #a0a8ff; }
-  .btn { background: #7c8cf8; color: #fff; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: background 0.2s; }
-  .btn:hover { background: #6b7bef; }
-  .btn:disabled { background: #444; cursor: not-allowed; }
-  .loading { text-align: center; padding: 40px; color: #888; }
-  .loading::after { content: ''; animation: dots 1.5s infinite; }
-  @keyframes dots { 0%,20% { content: '.'; } 40% { content: '..'; } 60%,100% { content: '...'; } }
+
+  /* ===== 卡片 ===== */
+  .card {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    padding: 20px;
+    border: 1px solid var(--border-subtle);
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: cardIn 0.5s ease-out both;
+  }
+  .card:hover { border-color: var(--border-glow); box-shadow: 0 0 30px rgba(59,130,246,0.06); }
+  .card h2 {
+    font-size: 13px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-secondary);
+    margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+  }
+  .card h2 .icon { font-size: 15px; }
+
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .card:nth-child(1) { animation-delay: 0.02s; }
+  .card:nth-child(2) { animation-delay: 0.06s; }
+  .card:nth-child(3) { animation-delay: 0.10s; }
+  .card:nth-child(4) { animation-delay: 0.14s; }
+
+  /* ===== 指标卡片 ===== */
+  .stat-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+    grid-column: 1 / -1;
+  }
+  .stat-grid-2 {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    grid-column: 1 / -1;
+  }
+  .stat-item {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    padding: 18px 16px;
+    border: 1px solid var(--border-subtle);
+    text-align: center;
+    position: relative; overflow: hidden;
+    transition: all 0.3s ease;
+    animation: cardIn 0.5s ease-out both;
+  }
+  .stat-item:hover { border-color: var(--border-glow); transform: translateY(-2px); }
+  .stat-item::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--accent);
+  }
+  .stat-item .label { font-size: 11px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+  .stat-item .value { font-family: var(--font-mono); font-size: 28px; font-weight: 600; color: var(--accent); margin-top: 6px; }
+  .stat-item .sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  .stat-item.active-rate { --accent: var(--accent-emerald); }
+  .stat-item.idle-time { --accent: var(--accent-amber); }
+  .stat-item.key-intensity { --accent: var(--accent-coral); }
+  .stat-item.focus-hours { --accent: var(--accent-blue); }
+
+  .stat-item:nth-child(1) { animation-delay: 0.02s; }
+  .stat-item:nth-child(2) { animation-delay: 0.05s; }
+  .stat-item:nth-child(3) { animation-delay: 0.08s; }
+  .stat-item:nth-child(4) { animation-delay: 0.11s; }
+
+  /* ===== 按钮 ===== */
+  .btn {
+    font-family: var(--font-display); font-size: 13px; font-weight: 600;
+    padding: 8px 20px; border-radius: 8px; border: none;
+    cursor: pointer; transition: all 0.2s ease;
+    background: var(--accent-blue); color: #fff;
+    letter-spacing: 0.01em;
+  }
+  .btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-export { background: transparent; border: 1px solid var(--border-subtle); color: var(--text-secondary); }
+  .btn-export:hover { border-color: var(--accent-blue); color: var(--accent-blue); background: rgba(59,130,246,0.08); }
+  .btn-pomo { background: var(--accent-coral); }
+  .btn-pomo-stop { background: transparent; border: 1px solid var(--text-muted); color: var(--text-secondary); }
+  .btn-pomo-break { background: var(--accent-emerald); }
+
+  /* ===== AI 分析 ===== */
+  .ai-section {
+    background: linear-gradient(135deg, #0f1328, #0a0e1f);
+    border: 1px solid var(--border-subtle);
+  }
+  .ai-content {
+    font-family: var(--font-display);
+    white-space: pre-wrap; line-height: 1.8; font-size: 14px;
+    color: var(--text-secondary); max-height: 500px; overflow-y: auto;
+  }
+  .ai-content h3 { color: var(--accent-blue); margin: 14px 0 6px; font-size: 15px; }
+  .ai-content strong { color: var(--accent-pink); }
+  #ai-btn-row { margin-bottom: 14px; display: flex; gap: 12px; align-items: center; }
+  .loading { text-align: center; padding: 40px; color: var(--text-muted); }
+
+  /* ===== 应用列表 ===== */
   .app-list { list-style: none; }
-  .app-list li { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #2a2a4a; font-size: 13px; }
-  .app-list .bar { height: 5px; background: #2a2a4a; border-radius: 3px; margin-top: 4px; }
-  .app-list .bar-fill { height: 100%; background: #7c8cf8; border-radius: 3px; transition: width 0.5s; }
+  .app-list li { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--border-subtle); font-size: 13px; }
+  .app-list li:last-child { border-bottom: none; }
+  .app-list .bar { height: 4px; background: rgba(59,130,246,0.08); border-radius: 2px; margin-top: 3px; }
+  .app-list .bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent-blue), var(--accent-pink)); border-radius: 2px; transition: width 0.5s ease; }
+
+  /* ===== 状态点 ===== */
   .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-  .status-dot.active { background: #4caf50; box-shadow: 0 0 6px #4caf5088; }
-  .status-dot.inactive { background: #666; }
-  #ai-btn-row { margin-bottom: 12px; display: flex; gap: 10px; align-items: center; }
+  .status-dot.active { background: var(--accent-emerald); box-shadow: 0 0 8px rgba(52,211,153,0.5); }
+  .status-dot.inactive { background: var(--text-muted); }
 
-  /* 活跃度时间轴 */
+  /* ===== 时间轴 ===== */
   .timeline-bar { display: flex; gap: 2px; margin-top: 12px; flex-wrap: wrap; }
-  .timeline-bar .hour-block { width: 28px; height: 32px; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; color: #aaa; background: #16213e; transition: background 0.3s; }
-  .timeline-bar .hour-block.is-focus { background: #00bcd433; border: 1px solid #00bcd466; color: #00bcd4; }
+  .hour-block {
+    width: 28px; height: 34px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-size: 9px;
+    color: var(--text-muted); background: #0c0f22;
+    transition: all 0.2s ease; cursor: default;
+  }
+  .hour-block:hover { transform: scale(1.15); z-index: 2; }
+  .hour-block.is-focus { border: 1px solid var(--accent-blue); color: var(--accent-blue); }
 
-  /* idle 标签 */
-  .idle-tag { display: inline-block; background: #ff980022; color: #ff9800; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
-  .focus-tag { display: inline-block; background: #00bcd422; color: #00bcd4; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+  /* ===== 标签 ===== */
+  .idle-tag, .focus-tag {
+    display: inline-block; padding: 3px 10px; border-radius: 12px;
+    font-family: var(--font-mono); font-size: 11px;
+  }
+  .idle-tag { background: rgba(245,158,11,0.1); color: var(--accent-amber); }
+  .focus-tag { background: rgba(59,130,246,0.1); color: var(--accent-blue); }
   .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 
-  .report-card { background: #16213e; border-radius: 8px; padding: 14px; margin-bottom: 10px; border-left: 3px solid #7c8cf8; }
-  .report-card .date { font-size: 13px; color: #7c8cf8; font-weight: 600; }
-  .report-card .stats { font-size: 12px; color: #888; margin-top: 4px; }
-  .report-card .ai-summary { font-size: 13px; color: #bbb; margin-top: 6px; line-height: 1.6; }
+  /* ===== 报告卡片 ===== */
+  .report-card {
+    background: #0c0f22; border-radius: 10px; padding: 14px 16px;
+    margin-bottom: 10px; border-left: 3px solid var(--accent-blue);
+    transition: all 0.2s ease;
+  }
+  .report-card:hover { border-left-color: var(--accent-pink); background: var(--bg-card-hover); }
+  .report-card .date { font-family: var(--font-mono); font-size: 12px; color: var(--accent-blue); font-weight: 600; }
+  .report-card .stats { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  .report-card .ai-summary { font-size: 13px; color: var(--text-secondary); margin-top: 6px; line-height: 1.6; }
+
+  /* ===== 番茄钟 ===== */
+  .pomo-ring {
+    width: 140px; height: 140px; border-radius: 50%;
+    border: 4px solid rgba(59,130,246,0.1);
+    margin: 0 auto 16px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; background: #0c0f22;
+  }
+  .pomo-ring svg { position: absolute; transform: rotate(-90deg); }
+  .pomo-ring .pomo-bg { fill: none; stroke: rgba(59,130,246,0.08); stroke-width: 4; }
+  .pomo-ring .pomo-progress {
+    fill: none; stroke: var(--accent-coral); stroke-width: 4;
+    stroke-linecap: round; transition: stroke-dashoffset 0.8s ease;
+  }
+  .pomo-ring.break .pomo-progress { stroke: var(--accent-emerald); }
+  #pomo-time { font-family: var(--font-mono); font-size: 30px; font-weight: 600; }
+  #pomo-state { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  #pomo-stats { font-size: 12px; color: var(--text-muted); margin-top: 12px; }
+
+  /* ===== 设置滑块 ===== */
+  .setting-group { margin-bottom: 14px; }
+  .setting-group label { font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 6px; }
+  .setting-group .val { font-family: var(--font-mono); font-size: 12px; color: var(--accent-blue); margin-left: 8px; }
+  input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 4px;
+    border-radius: 2px; background: rgba(59,130,246,0.1);
+    outline: none; margin: 4px 0;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    border-radius: 50%; background: var(--accent-blue);
+    cursor: pointer; box-shadow: 0 0 10px rgba(59,130,246,0.3);
+  }
+  .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .toggle-row label { font-size: 12px; color: var(--text-muted); }
+  .toggle-row input[type="checkbox"] { width: 36px; height: 20px; accent-color: var(--accent-blue); }
+  select.style-select {
+    background: #0c0f22; color: var(--text-primary);
+    border: 1px solid var(--border-subtle); padding: 7px 12px;
+    border-radius: 8px; font-family: var(--font-mono); font-size: 12px;
+    width: 100%; cursor: pointer;
+  }
+  select.style-select:focus { border-color: var(--accent-blue); outline: none; }
+
+  /* ===== 底部工具栏 ===== */
+  .toolbar {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 12px;
+  }
+  .toolbar-left { display: flex; gap: 8px; align-items: center; }
+  #classifier-status { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+
+  /* ===== 滚动条 ===== */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
 </style>
 </head>
 <body>
   <div class="header">
-    <div>
-      <h1>DeskMind</h1>
-      <p>多维度电脑行为分析 — 按键 / idle / 焦点时段 / AI 洞察</p>
+    <div class="header-brand">
+      <div class="header-logo">D</div>
+      <div>
+        <h1>Desk<span>Mind</span></h1>
+        <p>认知驾驶舱 · 行为分析 · AI 洞察</p>
+      </div>
     </div>
-    <span class="version">v2.0</span>
+    <span class="header-badge">v2.0</span>
   </div>
 
   <div class="container">
-    <!-- 第一行：核心指标 -->
+    <!-- 核心指标 -->
     <div class="stat-grid">
       <div class="stat-item active-rate">
         <div class="label">活跃率</div>
@@ -125,47 +330,43 @@ HTML_TEMPLATE = r"""
       </div>
     </div>
 
-    <!-- 第二行：基础指标 -->
+    <!-- 基础指标 -->
     <div class="stat-grid-2">
-      <div class="stat-item">
+      <div class="stat-item" style="--accent:var(--accent-blue);">
         <div class="label">今日追踪</div>
         <div class="value" id="total-minutes">--</div>
         <div class="sub">分钟</div>
       </div>
-      <div class="stat-item">
+      <div class="stat-item" style="--accent:var(--accent-blue);">
         <div class="label">活动记录数</div>
         <div class="value" id="total-records">--</div>
         <div class="sub">条采样</div>
       </div>
-      <div class="stat-item">
+      <div class="stat-item" style="--accent:var(--accent-blue);">
         <div class="label">效率指数</div>
         <div class="value" id="productive-ratio">--</div>
         <div class="sub">开发+办公+终端占比</div>
       </div>
     </div>
 
-    <!-- 类别饼图 -->
+    <!-- 类别饼图 + 强度柱图 -->
     <div class="card">
-      <h2><span class="icon">&#128202;</span> 时间分布（按类别）</h2>
+      <h2><span class="icon">&#9679;</span> 时间分布（按类别）</h2>
       <canvas id="category-chart" height="250"></canvas>
     </div>
-
-    <!-- 按键强度小时图 -->
     <div class="card">
       <h2><span class="icon">&#9000;</span> 每小时按键 / 点击强度</h2>
       <canvas id="intensity-chart" height="250"></canvas>
     </div>
 
-    <!-- 小时活跃分布 -->
+    <!-- 活跃时段 + 焦点分析 -->
     <div class="card">
       <h2><span class="icon">&#128336;</span> 活跃时段分布</h2>
       <canvas id="hourly-chart" height="200"></canvas>
     </div>
-
-    <!-- 焦点时段 + idle 分析 -->
     <div class="card">
-      <h2><span class="icon">&#127919;</span> 焦点时段 & Idle 分析</h2>
-      <div id="focus-info" style="font-size:14px; color:#aaa; margin-bottom:8px;">加载数据中...</div>
+      <h2><span class="icon">&#9733;</span> 焦点时段 & Idle 分析</h2>
+      <div id="focus-info" style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">加载数据中...</div>
       <div class="timeline-bar" id="hourly-timeline"></div>
       <div class="tag-list" id="idle-tags"></div>
     </div>
@@ -176,105 +377,109 @@ HTML_TEMPLATE = r"""
       <ul class="app-list" id="app-list"></ul>
     </div>
 
-    <!-- AI 分析 -->
-    <div class="card ai-section">
-      <h2><span class="icon">&#129302;</span> AI 智能分析</h2>
-      <div id="ai-btn-row">
-        <button class="btn" id="analyze-btn" onclick="runAnalysis()">让 AI 深度分析我的行为</button>
-        <span class="status-dot inactive" id="ollama-status"></span>
-        <span id="status-text" style="color:#888;font-size:13px">检测 Ollama 状态...</span>
-      </div>
-      <div id="ai-result" class="ai-content" style="display:none;"></div>
-      <div id="ai-loading" class="loading" style="display:none;">AI 正在多维度分析你的行为数据</div>
-    </div>
-
     <!-- 周趋势 -->
     <div class="card full-width">
       <h2><span class="icon">&#128200;</span> 7 天趋势</h2>
       <canvas id="weekly-trend-chart" height="180"></canvas>
     </div>
 
+    <!-- AI 分析 -->
+    <div class="card ai-section full-width">
+      <h2><span class="icon">&#9889;</span> AI 智能分析</h2>
+      <div id="ai-btn-row">
+        <button class="btn" id="analyze-btn" onclick="runAnalysis()">&#9654; 让 AI 深度分析我的行为</button>
+        <span class="status-dot inactive" id="ollama-status"></span>
+        <span id="status-text" style="color:var(--text-muted);font-size:12px;">检测 Ollama 状态...</span>
+      </div>
+      <div id="ai-result" class="ai-content" style="display:none;"></div>
+      <div id="ai-loading" class="loading" style="display:none;">AI 正在多维度分析你的行为数据...</div>
+    </div>
+
     <!-- 历史报告 -->
     <div class="card full-width">
       <h2><span class="icon">&#128197;</span> 历史报告</h2>
-      <div id="history-reports" style="font-size:14px; color:#888;">加载中...</div>
-    </div>
-
-    <!-- 底部工具栏 -->
-    <div class="card full-width" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-      <div style="display:flex; gap:10px; align-items:center;">
-        <button class="btn" onclick="exportData('json')" style="background:#4caf50;">导出 JSON</button>
-        <button class="btn" onclick="exportData('csv')" style="background:#ff9800;">导出 CSV</button>
-      </div>
-      <div id="classifier-status" style="font-size:12px; color:#888;">分类器状态加载中...</div>
+      <div id="history-reports" style="font-size:13px; color:var(--text-muted);">加载中...</div>
     </div>
 
     <!-- 番茄钟 -->
-    <div class="card" style="grid-column: 1/2;">
+    <div class="card">
       <h2><span class="icon">&#127813;</span> 番茄钟</h2>
-      <div style="text-align:center; padding:20px 0;">
-        <div id="pomo-circle" style="width:140px; height:140px; border-radius:50%; border:6px solid #2a2a4a; margin:0 auto 16px; display:flex; align-items:center; justify-content:center; position:relative; background:#16213e;">
-          <div id="pomo-progress" style="position:absolute; top:-3px; left:-3px; width:calc(100% + 6px); height:calc(100% + 6px); border-radius:50%; border:6px solid transparent; border-top-color:#e91e63; transition:transform 0.5s;"></div>
+      <div style="text-align:center; padding:10px 0;">
+        <div class="pomo-ring" id="pomo-ring">
+          <svg width="148" height="148" viewBox="0 0 148 148">
+            <circle class="pomo-bg" cx="74" cy="74" r="68"/>
+            <circle class="pomo-progress" id="pomo-progress" cx="74" cy="74" r="68"
+              stroke-dasharray="427.26" stroke-dashoffset="0"/>
+          </svg>
           <div>
-            <div id="pomo-time" style="font-size:32px; font-weight:700; color:#e0e0e0;">25:00</div>
-            <div id="pomo-state" style="font-size:12px; color:#888;">未开始</div>
+            <div id="pomo-time">25:00</div>
+            <div id="pomo-state">未开始</div>
           </div>
         </div>
         <div style="display:flex; gap:8px; justify-content:center;">
-          <button class="btn" id="pomo-start" onclick="pomoStart()" style="background:#e91e63;">开始工作</button>
-          <button class="btn" id="pomo-stop" onclick="pomoStop()" style="display:none; background:#666;">停止</button>
-          <button class="btn" id="pomo-break" onclick="pomoStartBreak()" style="display:none; background:#4caf50;">休息</button>
+          <button class="btn btn-pomo" id="pomo-start" onclick="pomoStart()">&#9654; 开始工作</button>
+          <button class="btn btn-pomo-stop" id="pomo-stop" onclick="pomoStop()" style="display:none;">&#9632; 停止</button>
+          <button class="btn btn-pomo-break" id="pomo-break" onclick="pomoStartBreak()" style="display:none;">&#9632; 休息</button>
         </div>
-        <div id="pomo-stats" style="margin-top:12px; font-size:12px; color:#666;">今日完成: 0 个番茄</div>
+        <div id="pomo-stats">今日完成: 0 个番茄</div>
       </div>
     </div>
 
     <!-- 设置 -->
-    <div class="card" style="grid-column: 2/3;">
+    <div class="card">
       <h2><span class="icon">&#9881;</span> 设置</h2>
-      <div style="display:grid; gap:14px;">
-        <div>
-          <label style="font-size:13px; color:#aaa; display:block; margin-bottom:4px;">追踪间隔（秒）</label>
-          <input type="range" id="cfg-interval" min="3" max="30" step="1" value="5" oninput="updateSetting('tracker_interval', this.value); document.getElementById('cfg-interval-val').textContent=this.value+'s'">
-          <span id="cfg-interval-val" style="font-size:12px; color:#7c8cf8;">5s</span>
+      <div class="setting-group">
+        <label>追踪间隔 <span class="val" id="cfg-interval-val">5s</span></label>
+        <input type="range" id="cfg-interval" min="3" max="30" step="1" value="5"
+          oninput="updateSetting('tracker_interval', this.value); document.getElementById('cfg-interval-val').textContent=this.value+'s'">
+      </div>
+      <div class="setting-group">
+        <label>Idle 超时 <span class="val" id="cfg-idle-val">60s</span></label>
+        <input type="range" id="cfg-idle" min="30" max="300" step="10" value="60"
+          oninput="updateSetting('idle_timeout', this.value); document.getElementById('cfg-idle-val').textContent=this.value+'s'">
+      </div>
+      <div class="setting-group">
+        <label>分心提醒阈值 <span class="val" id="cfg-distract-val">5min</span></label>
+        <input type="range" id="cfg-distract" min="1" max="30" step="1" value="5"
+          oninput="updateSetting('distraction_threshold', this.value*60); document.getElementById('cfg-distract-val').textContent=this.value+'min'">
+      </div>
+      <div class="toggle-row">
+        <input type="checkbox" id="cfg-alert" checked onchange="updateSetting('alert_enabled', this.checked)">
+        <label for="cfg-alert">启用提醒</label>
+      </div>
+      <div class="toggle-row">
+        <input type="checkbox" id="cfg-pomo" onchange="updateSetting('pomodoro_enabled', this.checked)">
+        <label for="cfg-pomo">启用番茄钟</label>
+      </div>
+      <div class="setting-group">
+        <label>AI 模型</label>
+        <select id="cfg-model" class="style-select" onchange="updateSetting('ollama_model', this.value)">
+          <option value="qwen2.5:1.5b">qwen2.5:1.5b</option>
+          <option value="qwen2.5:3b">qwen2.5:3b</option>
+          <option value="qwen2.5-coder:3b">qwen2.5-coder:3b</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 底部工具栏 -->
+    <div class="card full-width">
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <button class="btn btn-export" onclick="exportData('json')">&#128230; 导出 JSON</button>
+          <button class="btn btn-export" onclick="exportData('csv')">&#128230; 导出 CSV</button>
         </div>
-        <div>
-          <label style="font-size:13px; color:#aaa; display:block; margin-bottom:4px;">Idle 超时（秒）</label>
-          <input type="range" id="cfg-idle" min="30" max="300" step="10" value="60" oninput="updateSetting('idle_timeout', this.value); document.getElementById('cfg-idle-val').textContent=this.value+'s'">
-          <span id="cfg-idle-val" style="font-size:12px; color:#7c8cf8;">60s</span>
-        </div>
-        <div>
-          <label style="font-size:13px; color:#aaa; display:block; margin-bottom:4px;">分心提醒阈值（分钟）</label>
-          <input type="range" id="cfg-distract" min="1" max="30" step="1" value="5" oninput="updateSetting('distraction_threshold', this.value*60); document.getElementById('cfg-distract-val').textContent=this.value+'min'">
-          <span id="cfg-distract-val" style="font-size:12px; color:#7c8cf8;">5min</span>
-        </div>
-        <div style="display:flex; align-items:center; gap:10px;">
-          <label style="font-size:13px; color:#aaa;">启用提醒</label>
-          <input type="checkbox" id="cfg-alert" checked onchange="updateSetting('alert_enabled', this.checked)">
-        </div>
-        <div style="display:flex; align-items:center; gap:10px;">
-          <label style="font-size:13px; color:#aaa;">启用番茄钟</label>
-          <input type="checkbox" id="cfg-pomo" onchange="updateSetting('pomodoro_enabled', this.checked)">
-        </div>
-        <div>
-          <label style="font-size:13px; color:#aaa; display:block; margin-bottom:4px;">AI 模型</label>
-          <select id="cfg-model" onchange="updateSetting('ollama_model', this.value)" style="background:#16213e; color:#e0e0e0; border:1px solid #2a2a4a; padding:6px 10px; border-radius:6px; font-size:13px;">
-            <option value="qwen2.5:1.5b">qwen2.5:1.5b</option>
-            <option value="qwen2.5:3b">qwen2.5:3b</option>
-            <option value="qwen2.5-coder:3b">qwen2.5-coder:3b</option>
-          </select>
-        </div>
+        <div id="classifier-status">分类器状态加载中...</div>
       </div>
     </div>
   </div>
 
 <script>
-// 类别颜色/标签映射 v2（含新类别）
+// 类别颜色/标签映射
 const CATEGORY_COLORS = {
-  browser: '#e91e63', tech_reading: '#8bc34a', video: '#f44336', ai_chat: '#7c8cf8',
-  development: '#2196f3', terminal: '#9c27b0', ai_tool: '#00bcd4',
-  communication: '#ff9800', office: '#4caf50', entertainment: '#ff5722',
-  file_manager: '#795548', other: '#607d8b', uncategorized: '#455a64'
+  browser: '#f472b6', tech_reading: '#34d399', video: '#fb7185', ai_chat: '#3b82f6',
+  development: '#60a5fa', terminal: '#a78bfa', ai_tool: '#22d3ee',
+  communication: '#f59e0b', office: '#34d399', entertainment: '#f97316',
+  file_manager: '#a8a29e', other: '#64748b', uncategorized: '#475569'
 };
 const CATEGORY_LABELS = {
   browser: '浏览器', tech_reading: '技术阅读', video: '视频', ai_chat: 'AI 对话',
@@ -285,11 +490,13 @@ const CATEGORY_LABELS = {
 
 // 页面加载
 document.addEventListener('DOMContentLoaded', () => {
-  loadStats();
-  checkOllama();
+  loadStats(); checkOllama();
+  loadWeeklyTrend(); loadHistoryReports(); loadClassifierStatus();
   setInterval(loadStats, 30000);
+  updatePomodoro();
 });
 
+// ===== 统计 =====
 async function loadStats() {
   try {
     const resp = await fetch('/api/stats');
@@ -300,24 +507,17 @@ async function loadStats() {
 }
 
 function renderStats(data) {
-  // 核心指标
   document.getElementById('active-ratio').textContent = (data.active_ratio || 0) + '%';
-  document.getElementById('active-detail').textContent =
-    '活跃 ' + (data.active_minutes || 0) + ' / 空闲 ' + (data.idle_minutes || 0) + ' 分钟';
+  document.getElementById('active-detail').textContent = '活跃 ' + (data.active_minutes || 0) + ' / 空闲 ' + (data.idle_minutes || 0) + ' 分钟';
   document.getElementById('keys-per-min').textContent = data.keys_per_minute || 0;
   document.getElementById('total-keys').textContent = (data.total_keys || 0).toLocaleString();
   document.getElementById('total-clicks-sub').textContent = (data.total_clicks || 0).toLocaleString() + ' 次点击';
   document.getElementById('focus-count').textContent = (data.focus_hours || []).length;
-  document.getElementById('focus-detail').textContent =
-    (data.focus_hours || []).length > 0 ? '高强度编码/输入时段' : '暂无高强度时段';
-
-  // 基础指标
+  document.getElementById('focus-detail').textContent = (data.focus_hours || []).length > 0 ? '高强度编码/输入时段' : '暂无高强度时段';
   document.getElementById('total-minutes').textContent = data.total_minutes || 0;
   document.getElementById('total-records').textContent = (data.total_records || 0).toLocaleString();
   const productive = (data.by_category.development || 0) + (data.by_category.office || 0) + (data.by_category.terminal || 0);
-  const total = data.total_minutes || 1;
-  document.getElementById('productive-ratio').textContent = Math.round((productive / total) * 100) + '%';
-
+  document.getElementById('productive-ratio').textContent = Math.round((productive / (data.total_minutes || 1)) * 100) + '%';
   renderCategoryChart(data.by_category);
   renderIntensityChart(data.hourly_keys, data.hourly_clicks);
   renderHourlyChart(data.hourly_distribution);
@@ -329,14 +529,15 @@ let categoryChart = null;
 function renderCategoryChart(categories) {
   const labels = Object.keys(categories).map(k => CATEGORY_LABELS[k] || k);
   const values = Object.values(categories);
-  const colors = Object.keys(categories).map(k => CATEGORY_COLORS[k] || '#666');
-
+  const colors = Object.keys(categories).map(k => CATEGORY_COLORS[k] || '#64748b');
   const ctx = document.getElementById('category-chart').getContext('2d');
   if (categoryChart) categoryChart.destroy();
   categoryChart = new Chart(ctx, {
     type: 'doughnut',
     data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 0 }] },
-    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#ccc', font: { size: 11 }, padding: 12 } } } }
+    options: { responsive: true, cutout: '65%',
+      plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12, usePointStyle: true, pointStyle: 'circle' } } }
+    }
   });
 }
 
@@ -346,24 +547,19 @@ function renderIntensityChart(hourlyKeys, hourlyClicks) {
   const labels = hours.map(h => h.toString().padStart(2, '0') + ':00');
   const keyData = hours.map(h => hourlyKeys[h.toString().padStart(2, '0')] || 0);
   const clickData = hours.map(h => hourlyClicks[h.toString().padStart(2, '0')] || 0);
-
   const ctx = document.getElementById('intensity-chart').getContext('2d');
   if (intensityChart) intensityChart.destroy();
   intensityChart = new Chart(ctx, {
     type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        { label: '按键数', data: keyData, backgroundColor: 'rgba(233,30,99,0.7)', borderRadius: 3 },
-        { label: '点击数', data: clickData, backgroundColor: 'rgba(124,140,248,0.7)', borderRadius: 3 }
-      ]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { labels: { color: '#ccc', font: { size: 11 } } } },
+    data: { labels, datasets: [
+      { label: '按键数', data: keyData, backgroundColor: 'rgba(244,114,182,0.7)', borderRadius: 4, borderSkipped: false },
+      { label: '点击数', data: clickData, backgroundColor: 'rgba(59,130,246,0.7)', borderRadius: 4, borderSkipped: false }
+    ]},
+    options: { responsive: true,
+      plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 }, usePointStyle: true } } },
       scales: {
-        x: { ticks: { color: '#888', maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }, stacked: false },
-        y: { ticks: { color: '#888' }, grid: { color: '#2a2a4a' }, stacked: false }
+        x: { ticks: { color: '#475569', maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }, grid: { display: false } },
+        y: { ticks: { color: '#475569' }, grid: { color: 'rgba(59,130,246,0.06)' } }
       }
     }
   });
@@ -374,25 +570,15 @@ function renderHourlyChart(hourly) {
   const hours = Array.from({length: 24}, (_, i) => i);
   const labels = hours.map(h => h.toString().padStart(2, '0') + ':00');
   const values = hours.map(h => hourly[h.toString().padStart(2, '0')] || 0);
-
   const ctx = document.getElementById('hourly-chart').getContext('2d');
   if (hourlyChart) hourlyChart.destroy();
   hourlyChart = new Chart(ctx, {
     type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: '采样次数', data: values,
-        borderColor: '#7c8cf8', backgroundColor: 'rgba(124,140,248,0.15)',
-        fill: true, tension: 0.4, pointRadius: 2, pointHoverRadius: 5
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
+    data: { labels, datasets: [{ label: '采样次数', data: values, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.4, pointRadius: 2, pointHoverRadius: 5 }]},
+    options: { responsive: true, plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: '#888', maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
-        y: { ticks: { color: '#888' }, grid: { color: '#2a2a4a' } }
+        x: { ticks: { color: '#475569', maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }, grid: { display: false } },
+        y: { ticks: { color: '#475569' }, grid: { color: 'rgba(59,130,246,0.06)' } }
       }
     }
   });
@@ -400,33 +586,23 @@ function renderHourlyChart(hourly) {
 
 function renderAppList(apps) {
   const max = apps.length > 0 ? apps[0][1] : 1;
-  const ul = document.getElementById('app-list');
-  ul.innerHTML = apps.slice(0, 10).map(([name, mins]) => `
-    <li>
-      <span>${name}</span>
-      <span>${mins} 分钟</span>
-    </li>
-    <li style="padding:0;border:none;">
-      <div class="bar"><div class="bar-fill" style="width:${(mins/max)*100}%"></div></div>
-    </li>
-  `).join('');
+  document.getElementById('app-list').innerHTML = apps.slice(0, 10).map(([name, mins]) =>
+    '<li><span>' + name + '</span><span style="font-family:var(--font-mono);color:var(--text-muted);">' + mins + ' 分钟</span></li>' +
+    '<li style="padding:0;border:none;"><div class="bar"><div class="bar-fill" style="width:' + (mins/max)*100 + '%"></div></div></li>'
+  ).join('');
 }
 
 function renderFocusSection(data) {
   const focusHours = data.focus_hours || [];
   const hourlyIdle = data.hourly_idle || {};
   const hourlyKeys = data.hourly_keys || {};
-
-  // 信息文本
   const info = document.getElementById('focus-info');
   if (focusHours.length > 0) {
-    info.innerHTML = '检测到 <strong style="color:#00bcd4">' + focusHours.length + '</strong> 个高强度输入时段：' +
+    info.innerHTML = '检测到 <strong style="color:var(--accent-blue)">' + focusHours.length + '</strong> 个高强度输入时段：' +
       focusHours.map(h => '<span class="focus-tag">' + h + ':00</span>').join(' ');
   } else {
     info.textContent = '暂未检测到高强度输入时段（需积累更多数据）';
   }
-
-  // 24 小时时间轴
   const timeline = document.getElementById('hourly-timeline');
   const hours = Array.from({length: 24}, (_, i) => i);
   const maxKeys = Math.max(...Object.values(hourlyKeys), 1);
@@ -435,215 +611,133 @@ function renderFocusSection(data) {
     const keys = hourlyKeys[hStr] || 0;
     const isFocus = focusHours.includes(hStr);
     const opacity = Math.max(0.15, keys / maxKeys);
-    const bg = isFocus
-      ? 'rgba(0,188,212,' + opacity + ')'
-      : 'rgba(124,140,248,' + opacity + ')';
-    return '<div class="hour-block' + (isFocus ? ' is-focus' : '') + '" style="background:' + bg + '" title="' + hStr + ':00 - ' + keys + ' 次按键">' + hStr + '</div>';
+    return '<div class="hour-block' + (isFocus ? ' is-focus' : '') + '" style="background:rgba(59,130,246,' + opacity + ')" title="' + hStr + ':00 - ' + keys + ' 次按键">' + hStr + '</div>';
   }).join('');
-
-  // idle 标签（显示 idle 最多的前 5 个小时）
   const idleTags = document.getElementById('idle-tags');
   const sortedIdle = Object.entries(hourlyIdle).sort((a, b) => b[1] - a[1]).slice(0, 5);
   if (sortedIdle.length > 0) {
-    idleTags.innerHTML = '<span style="color:#888;font-size:12px;">高频 idle 时段：</span>' +
+    idleTags.innerHTML = '<span style="color:var(--text-muted);font-size:11px;">高频 idle 时段：</span>' +
       sortedIdle.map(([h, count]) => '<span class="idle-tag">' + h + ':00 (' + count + '次)</span>').join('');
   }
 }
 
+// ===== Ollama 状态 =====
 async function checkOllama() {
   const dot = document.getElementById('ollama-status');
   const text = document.getElementById('status-text');
   try {
     const resp = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(3000) });
-    if (resp.ok) {
-      dot.className = 'status-dot active';
-      text.textContent = 'Ollama 已连接';
-      text.style.color = '#4caf50';
-    } else throw new Error();
-  } catch(e) {
-    dot.className = 'status-dot inactive';
-    text.textContent = 'Ollama 未启动（AI 分析不可用）';
-    text.style.color = '#666';
-  }
+    if (resp.ok) { dot.className = 'status-dot active'; text.textContent = 'Ollama 已连接'; text.style.color = '#34d399'; }
+    else throw new Error();
+  } catch(e) { dot.className = 'status-dot inactive'; text.textContent = 'Ollama 未启动'; text.style.color = '#475569'; }
 }
 
+// ===== AI 分析 =====
 async function runAnalysis() {
   const btn = document.getElementById('analyze-btn');
   const result = document.getElementById('ai-result');
   const loading = document.getElementById('ai-loading');
-  btn.disabled = true;
-  btn.textContent = '分析中...';
-  loading.style.display = 'block';
-  result.style.display = 'none';
-
+  btn.disabled = true; btn.textContent = '分析中...';
+  loading.style.display = 'block'; result.style.display = 'none';
   try {
     const resp = await fetch('/api/analyze');
     const data = await resp.json();
-    loading.style.display = 'none';
-    result.style.display = 'block';
+    loading.style.display = 'none'; result.style.display = 'block';
     if (data.ai_analysis) {
       result.innerHTML = data.ai_analysis
-        .replace(/### (.*)/g, '<h3>$1</h3>')
-        .replace(/## (.*)/g, '<h3>$1</h3>')
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/- (.*)/g, '&#8226; $1<br>')
-        .replace(/\d+\.\s\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\n\n/g, '<br><br>');
-    } else if (data.error) {
-      result.innerHTML = '<span style="color:#f44336">' + data.error + '</span>';
-    }
-  } catch(e) {
-    loading.style.display = 'none';
-    result.style.display = 'block';
-    result.innerHTML = '<span style="color:#f44336">请求失败: ' + e.message + '</span>';
-  }
-
-  btn.disabled = false;
-  btn.textContent = '重新分析';
+        .replace(/### (.*)/g, '<h3>$1</h3>').replace(/## (.*)/g, '<h3>$1</h3>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/- (.*)/g, '&#8226; $1<br>')
+        .replace(/\d+\.\s\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n\n/g, '<br><br>');
+    } else if (data.error) { result.innerHTML = '<span style="color:var(--accent-coral)">' + data.error + '</span>'; }
+  } catch(e) { loading.style.display = 'none'; result.style.display = 'block'; result.innerHTML = '<span style="color:var(--accent-coral)">请求失败</span>'; }
+  btn.disabled = false; btn.textContent = '重新分析';
 }
 
-// 7 天趋势
+// ===== 周趋势 =====
 async function loadWeeklyTrend() {
-  try {
-    const resp = await fetch('/api/weekly-trend');
-    const data = await resp.json();
-    if (data.error) { return; }
-    renderWeeklyTrend(data);
-  } catch(e) {}
+  try { const resp = await fetch('/api/weekly-trend'); const data = await resp.json(); if (!data.error) renderWeeklyTrend(data); } catch(e) {}
 }
-
 let weeklyTrendChart = null;
 function renderWeeklyTrend(data) {
-  const labels = data.dates.map(d => d.slice(5)); // MM-DD
+  const labels = data.dates.map(d => d.slice(5));
   const ctx = document.getElementById('weekly-trend-chart').getContext('2d');
   if (weeklyTrendChart) weeklyTrendChart.destroy();
   weeklyTrendChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        { label: '活跃(分钟)', data: data.active_minutes, borderColor: '#4caf50', backgroundColor: 'rgba(76,175,80,0.1)', fill: true, tension: 0.3, pointRadius: 3 },
-        { label: '按键强度(次/分)', data: data.kpm, borderColor: '#e91e63', backgroundColor: 'rgba(233,30,99,0.1)', fill: false, tension: 0.3, pointRadius: 3, yAxisID: 'y1' }
-      ]
-    },
-    options: {
-      responsive: true,
-      interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { labels: { color: '#ccc', font: { size: 11 } } } },
+    type: 'line', data: { labels, datasets: [
+      { label: '活跃(分钟)', data: data.active_minutes, borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,0.08)', fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#34d399' },
+      { label: '按键强度(次/分)', data: data.kpm, borderColor: '#f472b6', backgroundColor: 'rgba(244,114,182,0.08)', fill: false, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#f472b6', yAxisID: 'y1' }
+    ]},
+    options: { responsive: true, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 }, usePointStyle: true } } },
       scales: {
-        x: { ticks: { color: '#888' }, grid: { color: '#2a2a4a' } },
-        y: { type: 'linear', position: 'left', ticks: { color: '#4caf50' }, grid: { color: '#2a2a4a' }, title: { display: true, text: '分钟', color: '#4caf50' } },
-        y1: { type: 'linear', position: 'right', ticks: { color: '#e91e63' }, grid: { drawOnChartArea: false }, title: { display: true, text: '次/分', color: '#e91e63' } }
+        x: { ticks: { color: '#475569' }, grid: { display: false } },
+        y: { ticks: { color: '#475569' }, grid: { color: 'rgba(59,130,246,0.06)' }, title: { display: true, text: '分钟', color: '#475569' } },
+        y1: { position: 'right', ticks: { color: '#475569' }, grid: { drawOnChartArea: false }, title: { display: true, text: '次/分', color: '#475569' } }
       }
     }
   });
 }
 
-// 历史报告
+// ===== 历史报告 =====
 async function loadHistoryReports() {
   try {
-    const resp = await fetch('/api/reports');
-    const data = await resp.json();
+    const resp = await fetch('/api/reports'); const data = await resp.json();
     const container = document.getElementById('history-reports');
-    if (!data.length) {
-      container.innerHTML = '<div style="color:#666;">暂无历史报告。运行 <code>python reporter.py today</code> 生成第一份报告。</div>';
-      return;
-    }
+    if (!data.length) { container.innerHTML = '<div style="color:var(--text-muted);">暂无历史报告。运行 <code style="background:#0c0f22;padding:2px 6px;border-radius:4px;">python reporter.py today</code> 生成第一份报告。</div>'; return; }
     container.innerHTML = data.map(r => {
       const aiText = (r.ai_analysis || '无 AI 分析').substring(0, 200);
-      return '<div class="report-card">' +
-        '<div class="date">' + r.date + '</div>' +
-        '<div class="stats">活跃 ' + (r.total_active_minutes || 0) + ' 分钟 | 空闲 ' + (r.total_idle_minutes || 0) + ' 分钟 | 按键 ' + (r.total_key_strokes || 0) + ' 次</div>' +
-        '<div class="ai-summary">' + aiText.replace(/\n/g, '<br>') + '...</div>' +
-        '</div>';
+      return '<div class="report-card"><div class="date">' + r.date + '</div><div class="stats">活跃 ' + (r.total_active_minutes || 0) + ' 分钟 | 空闲 ' + (r.total_idle_minutes || 0) + ' 分钟 | 按键 ' + (r.total_key_strokes || 0) + ' 次</div><div class="ai-summary">' + aiText.replace(/\n/g, '<br>') + '...</div></div>';
     }).join('');
-  } catch(e) {
-    document.getElementById('history-reports').innerHTML = '<div style="color:#666;">加载失败</div>';
-  }
+  } catch(e) { document.getElementById('history-reports').innerHTML = '<div style="color:var(--text-muted);">加载失败</div>'; }
 }
 
-// 数据导出
+// ===== 导出 =====
 async function exportData(format) {
   try {
     const resp = await fetch('/api/export?format=' + format + '&days=7');
     const blob = await resp.blob();
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'deskmind_export_7d.' + format;
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch(e) {
-    alert('导出失败: ' + e.message);
-  }
+    const a = document.createElement('a'); a.href = url; a.download = 'deskmind_export_7d.' + format; a.click(); URL.revokeObjectURL(url);
+  } catch(e) { alert('导出失败'); }
 }
 
-// 分类器状态
+// ===== 分类器状态 =====
 async function loadClassifierStatus() {
   try {
-    const resp = await fetch('/api/classifier-status');
-    const data = await resp.json();
+    const resp = await fetch('/api/classifier-status'); const data = await resp.json();
     const el = document.getElementById('classifier-status');
-    const aiLabel = data.ollama_available
-      ? '<span style="color:#4caf50;">AI 分类已启用</span>'
-      : '<span style="color:#ff9800;">AI 离线，使用规则分类</span>';
-    el.innerHTML = aiLabel + ' | 缓存: ' + data.total_cached + ' 条 | ' +
-      Object.entries(data.by_category || {}).map(([k,v]) => k + ':' + v).join(' ');
+    el.innerHTML = (data.ollama_available ? '<span style="color:#34d399;">AI 分类</span>' : '<span style="color:#f59e0b;">规则分类</span>') +
+      ' | 缓存 ' + data.total_cached + ' 条';
   } catch(e) {}
 }
 
-// 页面加载时也请求这些数据
-document.addEventListener('DOMContentLoaded', () => {
-  loadWeeklyTrend();
-  loadHistoryReports();
-  loadClassifierStatus();
-});
-
 // ===== 番茄钟 =====
-let pomoInterval = null;
-function pomoStart() {
-  fetch('/api/pomodoro', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'start_work'})}).then(() => updatePomodoro());
-}
-function pomoStartBreak() {
-  fetch('/api/pomodoro', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'start_break'})}).then(() => updatePomodoro());
-}
-function pomoStop() {
-  fetch('/api/pomodoro', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'stop'})}).then(() => updatePomodoro());
-}
+function pomoStart() { fetch('/api/pomodoro', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'start_work'})}).then(() => updatePomodoro()); }
+function pomoStartBreak() { fetch('/api/pomodoro', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'start_break'})}).then(() => updatePomodoro()); }
+function pomoStop() { fetch('/api/pomodoro', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'stop'})}).then(() => updatePomodoro()); }
 function updatePomodoro() {
   fetch('/api/pomodoro').then(r=>r.json()).then(data => {
     const mins = Math.floor(data.remaining / 60);
     const secs = data.remaining % 60;
     document.getElementById('pomo-time').textContent = String(mins).padStart(2,'0') + ':' + String(secs).padStart(2,'0');
     document.getElementById('pomo-state').textContent = {idle:'未开始',working:'工作中',break:'休息中'}[data.state] || data.state;
-    
-    // 旋转进度环
-    const deg = data.progress * 360;
-    document.getElementById('pomo-progress').style.transform = 'rotate(' + deg + 'deg)';
-    document.getElementById('pomo-progress').style.borderTopColor = data.state === 'break' ? '#4caf50' : '#e91e63';
-    
-    // 按钮状态
-    const isIdle = data.state === 'idle';
-    const isWorking = data.state === 'working';
-    document.getElementById('pomo-start').style.display = isIdle ? '' : 'none';
-    document.getElementById('pomo-stop').style.display = isIdle ? 'none' : '';
-    document.getElementById('pomo-break').style.display = (data.state === 'break') ? '' : 'none';
-    
-    // 自动转换检测
-    if (isWorking && data.remaining <= 0) pomoStartBreak();
+    const circumference = 68 * 2 * Math.PI;
+    document.getElementById('pomo-progress').style.strokeDashoffset = circumference * (1 - data.progress);
+    document.getElementById('pomo-ring').className = 'pomo-ring' + (data.state === 'break' ? ' break' : '');
+    document.getElementById('pomo-start').style.display = data.state === 'idle' ? '' : 'none';
+    document.getElementById('pomo-stop').style.display = data.state === 'idle' ? 'none' : '';
+    document.getElementById('pomo-break').style.display = data.state === 'break' ? '' : 'none';
+    if (data.state === 'working' && data.remaining <= 0) pomoStartBreak();
     if (data.state === 'break' && data.remaining <= 0) pomoStop();
-    
     document.getElementById('pomo-stats').textContent = '今日完成: ' + data.completed_count + ' 个番茄';
   });
 }
 setInterval(updatePomodoro, 1000);
-updatePomodoro();
 
 // ===== 设置 =====
 async function loadSettings() {
   try {
-    const resp = await fetch('/api/settings');
-    const data = await resp.json();
+    const resp = await fetch('/api/settings'); const data = await resp.json();
     document.getElementById('cfg-interval').value = data.tracker_interval || 5;
     document.getElementById('cfg-interval-val').textContent = (data.tracker_interval || 5) + 's';
     document.getElementById('cfg-idle').value = data.idle_timeout || 60;
@@ -655,9 +749,7 @@ async function loadSettings() {
     document.getElementById('cfg-model').value = data.ollama_model || 'qwen2.5:1.5b';
   } catch(e) {}
 }
-function updateSetting(key, value) {
-  fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key, value})});
-}
+function updateSetting(key, value) { fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key, value})}); }
 document.addEventListener('DOMContentLoaded', loadSettings);
 </script>
 </body>
