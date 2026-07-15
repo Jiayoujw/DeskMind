@@ -42,8 +42,8 @@ HTML_TEMPLATE = r"""
     --accent-amber: #f59e0b;
     --accent-coral: #fb7185;
     --text-primary: #e2e8f0;
-    --text-secondary: #94a3b8;
-    --text-muted: #475569;
+    --text-secondary: #a8b4c8;
+    --text-muted: #64748b;
     --radius: 14px;
     --font-display: 'Bricolage Grotesque', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
@@ -147,9 +147,9 @@ HTML_TEMPLATE = r"""
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
     background: var(--accent);
   }
-  .stat-item .label { font-size: 11px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+  .stat-item .label { font-size: 11px; color: var(--text-secondary); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
   .stat-item .value { font-family: var(--font-mono); font-size: 28px; font-weight: 600; color: var(--accent); margin-top: 6px; }
-  .stat-item .sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  .stat-item .sub { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
   .stat-item.active-rate { --accent: var(--accent-emerald); }
   .stat-item.idle-time { --accent: var(--accent-amber); }
   .stat-item.key-intensity { --accent: var(--accent-coral); }
@@ -291,6 +291,29 @@ HTML_TEMPLATE = r"""
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
+
+  /* ===== 空状态 ===== */
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 32px 16px; color: var(--text-muted); text-align: center; gap: 8px;
+  }
+  .empty-state .empty-icon { font-size: 28px; opacity: 0.4; }
+  .empty-state .empty-title { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+  .empty-state .empty-hint { font-size: 11px; color: var(--text-muted); }
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .skeleton {
+    background: linear-gradient(90deg, rgba(59,130,246,0.04) 25%, rgba(59,130,246,0.08) 50%, rgba(59,130,246,0.04) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+    border-radius: 8px;
+  }
+  .skeleton-chart { height: 180px; width: 100%; }
+  .skeleton-bar { height: 120px; width: 100%; }
+  .skeleton-line { height: 12px; width: 60%; margin: 0 auto; }
+  .app-empty { padding: 20px 0; text-align: center; color: var(--text-muted); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -310,23 +333,23 @@ HTML_TEMPLATE = r"""
     <div class="stat-grid">
       <div class="stat-item active-rate">
         <div class="label">活跃率</div>
-        <div class="value" id="active-ratio">--</div>
-        <div class="sub" id="active-detail">活跃 -- / 空闲 -- 分钟</div>
+        <div class="value" id="active-ratio">0%</div>
+        <div class="sub" id="active-detail">运行 tracker.py 开始采集</div>
       </div>
       <div class="stat-item key-intensity">
         <div class="label">按键强度</div>
-        <div class="value" id="keys-per-min">--</div>
+        <div class="value" id="keys-per-min">0</div>
         <div class="sub">次/分钟（活跃时段）</div>
       </div>
       <div class="stat-item idle-time">
         <div class="label">总按键 / 点击</div>
-        <div class="value" id="total-keys">--</div>
-        <div class="sub" id="total-clicks-sub">-- 次点击</div>
+        <div class="value" id="total-keys">0</div>
+        <div class="sub" id="total-clicks-sub">0 次点击</div>
       </div>
       <div class="stat-item focus-hours">
         <div class="label">焦点时段</div>
-        <div class="value" id="focus-count">--</div>
-        <div class="sub" id="focus-detail">高强度编码/输入</div>
+        <div class="value" id="focus-count">0</div>
+        <div class="sub" id="focus-detail">等待数据积累</div>
       </div>
     </div>
 
@@ -334,17 +357,17 @@ HTML_TEMPLATE = r"""
     <div class="stat-grid-2">
       <div class="stat-item" style="--accent:var(--accent-blue);">
         <div class="label">今日追踪</div>
-        <div class="value" id="total-minutes">--</div>
+        <div class="value" id="total-minutes">0</div>
         <div class="sub">分钟</div>
       </div>
-      <div class="stat-item" style="--accent:var(--accent-blue);">
+      <div class="stat-item" style="--accent:var(--accent-pink);">
         <div class="label">活动记录数</div>
-        <div class="value" id="total-records">--</div>
+        <div class="value" id="total-records">0</div>
         <div class="sub">条采样</div>
       </div>
-      <div class="stat-item" style="--accent:var(--accent-blue);">
+      <div class="stat-item" style="--accent:var(--accent-emerald);">
         <div class="label">效率指数</div>
-        <div class="value" id="productive-ratio">--</div>
+        <div class="value" id="productive-ratio">0%</div>
         <div class="sub">开发+办公+终端占比</div>
       </div>
     </div>
@@ -352,17 +375,27 @@ HTML_TEMPLATE = r"""
     <!-- 类别饼图 + 强度柱图 -->
     <div class="card">
       <h2><span class="icon">&#9679;</span> 时间分布（按类别）</h2>
-      <canvas id="category-chart" height="250"></canvas>
+      <div id="category-chart-wrap">
+        <div class="skeleton skeleton-chart"></div>
+        <div class="skeleton skeleton-line" style="margin-top:12px;"></div>
+      </div>
+      <canvas id="category-chart" height="250" style="display:none;"></canvas>
     </div>
     <div class="card">
       <h2><span class="icon">&#9000;</span> 每小时按键 / 点击强度</h2>
-      <canvas id="intensity-chart" height="250"></canvas>
+      <div id="intensity-chart-wrap">
+        <div class="skeleton skeleton-bar"></div>
+      </div>
+      <canvas id="intensity-chart" height="250" style="display:none;"></canvas>
     </div>
 
     <!-- 活跃时段 + 焦点分析 -->
     <div class="card">
       <h2><span class="icon">&#128336;</span> 活跃时段分布</h2>
-      <canvas id="hourly-chart" height="200"></canvas>
+      <div id="hourly-chart-wrap">
+        <div class="skeleton skeleton-bar"></div>
+      </div>
+      <canvas id="hourly-chart" height="200" style="display:none;"></canvas>
     </div>
     <div class="card">
       <h2><span class="icon">&#9733;</span> 焦点时段 & Idle 分析</h2>
@@ -374,7 +407,7 @@ HTML_TEMPLATE = r"""
     <!-- 应用排行 -->
     <div class="card">
       <h2><span class="icon">&#128187;</span> 应用使用排行</h2>
-      <ul class="app-list" id="app-list"></ul>
+      <div id="app-list"><div class="app-empty">等待数据采集...</div></div>
     </div>
 
     <!-- 周趋势 -->
@@ -518,6 +551,16 @@ function renderStats(data) {
   document.getElementById('total-records').textContent = (data.total_records || 0).toLocaleString();
   const productive = (data.by_category.development || 0) + (data.by_category.office || 0) + (data.by_category.terminal || 0);
   document.getElementById('productive-ratio').textContent = Math.round((productive / (data.total_minutes || 1)) * 100) + '%';
+
+  // 隐藏 skeleton，显示 canvas
+  ['category-chart-wrap','intensity-chart-wrap','hourly-chart-wrap'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  document.getElementById('category-chart').style.display = '';
+  document.getElementById('intensity-chart').style.display = '';
+  document.getElementById('hourly-chart').style.display = '';
+
   renderCategoryChart(data.by_category);
   renderIntensityChart(data.hourly_keys, data.hourly_clicks);
   renderHourlyChart(data.hourly_distribution);
@@ -585,11 +628,16 @@ function renderHourlyChart(hourly) {
 }
 
 function renderAppList(apps) {
-  const max = apps.length > 0 ? apps[0][1] : 1;
-  document.getElementById('app-list').innerHTML = apps.slice(0, 10).map(([name, mins]) =>
-    '<li><span>' + name + '</span><span style="font-family:var(--font-mono);color:var(--text-muted);">' + mins + ' 分钟</span></li>' +
+  const container = document.getElementById('app-list');
+  if (!apps || apps.length === 0) {
+    container.innerHTML = '<div class="app-empty">暂无应用数据，开始使用电脑后自动采集</div>';
+    return;
+  }
+  const max = apps[0][1];
+  container.innerHTML = '<ul class="app-list">' + apps.slice(0, 10).map(([name, mins]) =>
+    '<li><span>' + name + '</span><span style="font-family:var(--font-mono);color:var(--text-secondary);">' + mins + ' 分钟</span></li>' +
     '<li style="padding:0;border:none;"><div class="bar"><div class="bar-fill" style="width:' + (mins/max)*100 + '%"></div></div></li>'
-  ).join('');
+  ).join('') + '</ul>';
 }
 
 function renderFocusSection(data) {
