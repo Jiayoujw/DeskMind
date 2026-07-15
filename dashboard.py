@@ -12,6 +12,8 @@ from flask import Flask, render_template_string, jsonify, request
 
 from analyzer import compute_stats, analyze_today, get_date_range_activity
 from export import export_json, export_csv
+from config import get as config_get, set as config_set, get_all as config_get_all
+from pomodoro import pomodoro, get_pomodoro_stats
 
 app = Flask(__name__, static_folder=str(Path(__file__).parent / "static"))
 DB_PATH = Path(__file__).parent / "deskmind.db"
@@ -205,6 +207,64 @@ HTML_TEMPLATE = r"""
         <button class="btn" onclick="exportData('csv')" style="background:#ff9800;">导出 CSV</button>
       </div>
       <div id="classifier-status" style="font-size:12px; color:#888;">分类器状态加载中...</div>
+    </div>
+
+    <!-- 番茄钟 -->
+    <div class="card" style="grid-column: 1/2;">
+      <h2><span class="icon">&#127813;</span> 番茄钟</h2>
+      <div style="text-align:center; padding:20px 0;">
+        <div id="pomo-circle" style="width:140px; height:140px; border-radius:50%; border:6px solid #2a2a4a; margin:0 auto 16px; display:flex; align-items:center; justify-content:center; position:relative; background:#16213e;">
+          <div id="pomo-progress" style="position:absolute; top:-3px; left:-3px; width:calc(100% + 6px); height:calc(100% + 6px); border-radius:50%; border:6px solid transparent; border-top-color:#e91e63; transition:transform 0.5s;"></div>
+          <div>
+            <div id="pomo-time" style="font-size:32px; font-weight:700; color:#e0e0e0;">25:00</div>
+            <div id="pomo-state" style="font-size:12px; color:#888;">未开始</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; justify-content:center;">
+          <button class="btn" id="pomo-start" onclick="pomoStart()" style="background:#e91e63;">开始工作</button>
+          <button class="btn" id="pomo-stop" onclick="pomoStop()" style="display:none; background:#666;">停止</button>
+          <button class="btn" id="pomo-break" onclick="pomoStartBreak()" style="display:none; background:#4caf50;">休息</button>
+        </div>
+        <div id="pomo-stats" style="margin-top:12px; font-size:12px; color:#666;">今日完成: 0 个番茄</div>
+      </div>
+    </div>
+
+    <!-- 设置 -->
+    <div class="card" style="grid-column: 2/3;">
+      <h2><span class="icon">&#9881;</span> 设置</h2>
+      <div style="display:grid; gap:14px;">
+        <div>
+          <label style="font-size:13px; color:#aaa; display:block; margin-bottom:4px;">追踪间隔（秒）</label>
+          <input type="range" id="cfg-interval" min="3" max="30" step="1" value="5" oninput="updateSetting('tracker_interval', this.value); document.getElementById('cfg-interval-val').textContent=this.value+'s'">
+          <span id="cfg-interval-val" style="font-size:12px; color:#7c8cf8;">5s</span>
+        </div>
+        <div>
+          <label style="font-size:13px; color:#aaa; display:block; margin-bottom:4px;">Idle 超时（秒）</label>
+          <input type="range" id="cfg-idle" min="30" max="300" step="10" value="60" oninput="updateSetting('idle_timeout', this.value); document.getElementById('cfg-idle-val').textContent=this.value+'s'">
+          <span id="cfg-idle-val" style="font-size:12px; color:#7c8cf8;">60s</span>
+        </div>
+        <div>
+          <label style="font-size:13px; color:#aaa; display:block; margin-bottom:4px;">分心提醒阈值（分钟）</label>
+          <input type="range" id="cfg-distract" min="1" max="30" step="1" value="5" oninput="updateSetting('distraction_threshold', this.value*60); document.getElementById('cfg-distract-val').textContent=this.value+'min'">
+          <span id="cfg-distract-val" style="font-size:12px; color:#7c8cf8;">5min</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <label style="font-size:13px; color:#aaa;">启用提醒</label>
+          <input type="checkbox" id="cfg-alert" checked onchange="updateSetting('alert_enabled', this.checked)">
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <label style="font-size:13px; color:#aaa;">启用番茄钟</label>
+          <input type="checkbox" id="cfg-pomo" onchange="updateSetting('pomodoro_enabled', this.checked)">
+        </div>
+        <div>
+          <label style="font-size:13px; color:#aaa; display:block; margin-bottom:4px;">AI 模型</label>
+          <select id="cfg-model" onchange="updateSetting('ollama_model', this.value)" style="background:#16213e; color:#e0e0e0; border:1px solid #2a2a4a; padding:6px 10px; border-radius:6px; font-size:13px;">
+            <option value="qwen2.5:1.5b">qwen2.5:1.5b</option>
+            <option value="qwen2.5:3b">qwen2.5:3b</option>
+            <option value="qwen2.5-coder:3b">qwen2.5-coder:3b</option>
+          </select>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -538,6 +598,67 @@ document.addEventListener('DOMContentLoaded', () => {
   loadHistoryReports();
   loadClassifierStatus();
 });
+
+// ===== 番茄钟 =====
+let pomoInterval = null;
+function pomoStart() {
+  fetch('/api/pomodoro', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'start_work'})}).then(() => updatePomodoro());
+}
+function pomoStartBreak() {
+  fetch('/api/pomodoro', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'start_break'})}).then(() => updatePomodoro());
+}
+function pomoStop() {
+  fetch('/api/pomodoro', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'stop'})}).then(() => updatePomodoro());
+}
+function updatePomodoro() {
+  fetch('/api/pomodoro').then(r=>r.json()).then(data => {
+    const mins = Math.floor(data.remaining / 60);
+    const secs = data.remaining % 60;
+    document.getElementById('pomo-time').textContent = String(mins).padStart(2,'0') + ':' + String(secs).padStart(2,'0');
+    document.getElementById('pomo-state').textContent = {idle:'未开始',working:'工作中',break:'休息中'}[data.state] || data.state;
+    
+    // 旋转进度环
+    const deg = data.progress * 360;
+    document.getElementById('pomo-progress').style.transform = 'rotate(' + deg + 'deg)';
+    document.getElementById('pomo-progress').style.borderTopColor = data.state === 'break' ? '#4caf50' : '#e91e63';
+    
+    // 按钮状态
+    const isIdle = data.state === 'idle';
+    const isWorking = data.state === 'working';
+    document.getElementById('pomo-start').style.display = isIdle ? '' : 'none';
+    document.getElementById('pomo-stop').style.display = isIdle ? 'none' : '';
+    document.getElementById('pomo-break').style.display = (data.state === 'break') ? '' : 'none';
+    
+    // 自动转换检测
+    if (isWorking && data.remaining <= 0) pomoStartBreak();
+    if (data.state === 'break' && data.remaining <= 0) pomoStop();
+    
+    document.getElementById('pomo-stats').textContent = '今日完成: ' + data.completed_count + ' 个番茄';
+  });
+}
+setInterval(updatePomodoro, 1000);
+updatePomodoro();
+
+// ===== 设置 =====
+async function loadSettings() {
+  try {
+    const resp = await fetch('/api/settings');
+    const data = await resp.json();
+    document.getElementById('cfg-interval').value = data.tracker_interval || 5;
+    document.getElementById('cfg-interval-val').textContent = (data.tracker_interval || 5) + 's';
+    document.getElementById('cfg-idle').value = data.idle_timeout || 60;
+    document.getElementById('cfg-idle-val').textContent = (data.idle_timeout || 60) + 's';
+    document.getElementById('cfg-distract').value = (data.distraction_threshold || 300) / 60;
+    document.getElementById('cfg-distract-val').textContent = ((data.distraction_threshold || 300) / 60) + 'min';
+    document.getElementById('cfg-alert').checked = data.alert_enabled !== false;
+    document.getElementById('cfg-pomo').checked = !!data.pomodoro_enabled;
+    document.getElementById('cfg-model').value = data.ollama_model || 'qwen2.5:1.5b';
+  } catch(e) {}
+}
+function updateSetting(key, value) {
+  fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key, value})});
+}
+document.addEventListener('DOMContentLoaded', loadSettings);
 </script>
 </body>
 </html>
@@ -659,6 +780,49 @@ def api_classifier_status():
         return jsonify(get_cache_stats())
     except:
         return jsonify({"total_cached": 0, "by_category": {}, "ollama_available": False})
+
+
+@app.route("/api/settings", methods=["GET"])
+def api_get_settings():
+    """获取所有配置"""
+    return jsonify(config_get_all())
+
+
+@app.route("/api/settings", methods=["POST"])
+def api_set_setting():
+    """设置单个配置项"""
+    data = request.get_json()
+    key = data.get("key")
+    value = data.get("value")
+    if key:
+        # 数值类型转换
+        if isinstance(value, str) and value.isdigit():
+            value = int(value)
+        config_set(key, value)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/pomodoro", methods=["GET"])
+def api_pomodoro_status():
+    """获取番茄钟状态"""
+    return jsonify(pomodoro.to_dict())
+
+
+@app.route("/api/pomodoro", methods=["POST"])
+def api_pomodoro_action():
+    """番茄钟操作"""
+    data = request.get_json()
+    action = data.get("action", "")
+    if action == "start_work":
+        work = config_get("pomodoro_work", 25)
+        brk = config_get("pomodoro_break", 5)
+        pomodoro.configure(work, brk)
+        pomodoro.start_work()
+    elif action == "start_break":
+        pomodoro.start_break()
+    elif action == "stop":
+        pomodoro.stop()
+    return jsonify(pomodoro.to_dict())
 
 
 # ============ 启动 ============

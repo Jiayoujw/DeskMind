@@ -118,7 +118,9 @@ DeskMind/
 ├── analyzer.py       # Statistics engine + AI analysis (Ollama)
 ├── reporter.py       # Daily/weekly report generation + scheduler
 ├── alerter.py        # Smart distraction alerts (context-aware)
-├── dashboard.py      # Flask web dashboard (Chart.js)
+├── pomodoro.py       # Pomodoro timer with persistence
+├── config.py         # Persistent settings management (SQLite)
+├── dashboard.py      # Flask web dashboard (Chart.js + settings + pomodoro)
 ├── export.py         # JSON/CSV data export
 ├── requirements.txt  # Python dependencies
 └── .gitignore
@@ -166,10 +168,10 @@ DeskMind/
 - [x] System tray app with one-click start/stop
 - [x] Data export (JSON/CSV)
 - [x] Daily/weekly AI reports with scheduling
+- [x] Pomodoro timer with focus detection
+- [x] Configurable settings via dashboard UI
 - [ ] Browser extension for URL-level tracking
 - [ ] macOS/Linux support
-- [ ] Pomodoro integration based on focus detection
-- [ ] Configurable alert thresholds via dashboard UI
 
 ## Inspiration
 
