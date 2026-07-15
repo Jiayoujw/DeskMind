@@ -10,7 +10,7 @@ from pathlib import Path
 from collections import Counter, defaultdict
 from flask import Flask, render_template_string, jsonify, request
 
-from analyzer import compute_stats, analyze_today, get_date_range_activity
+from analyzer import compute_stats, analyze_today, get_date_range_activity, compute_efficiency_score, save_efficiency_score, get_efficiency_history
 from export import export_json, export_csv
 from config import get as config_get, set as config_set, get_all as config_get_all
 from pomodoro import pomodoro, get_pomodoro_stats
@@ -314,6 +314,41 @@ HTML_TEMPLATE = r"""
   .skeleton-bar { height: 120px; width: 100%; }
   .skeleton-line { height: 12px; width: 60%; margin: 0 auto; }
   .app-empty { padding: 20px 0; text-align: center; color: var(--text-muted); font-size: 13px; }
+
+  /* ===== 效率评分 ===== */
+  .score-card {
+    display: flex; align-items: center; gap: 24px; padding: 24px;
+  }
+  .score-ring-wrap {
+    position: relative; width: 120px; height: 120px; flex-shrink: 0;
+  }
+  .score-ring-wrap svg { position: absolute; transform: rotate(-90deg); }
+  .score-ring-bg { fill: none; stroke: rgba(59,130,246,0.08); stroke-width: 6; }
+  .score-ring-fill {
+    fill: none; stroke-width: 6; stroke-linecap: round;
+    transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.5s ease;
+  }
+  .score-center {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  .score-number {
+    font-family: var(--font-mono); font-size: 36px; font-weight: 700; line-height: 1;
+  }
+  .score-grade {
+    font-size: 13px; font-weight: 600; margin-top: 2px; letter-spacing: 0.04em;
+  }
+  .score-breakdown { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+  .score-row {
+    display: flex; align-items: center; gap: 10px; font-size: 12px;
+  }
+  .score-row .s-label { color: var(--text-secondary); width: 72px; flex-shrink: 0; }
+  .score-row .s-bar-bg {
+    flex: 1; height: 6px; background: rgba(59,130,246,0.08); border-radius: 3px; overflow: hidden;
+  }
+  .score-row .s-bar-fill { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
+  .score-row .s-pts { font-family: var(--font-mono); color: var(--text-muted); width: 36px; text-align: right; flex-shrink: 0; }
+  .score-row .s-val { font-family: var(--font-mono); color: var(--text-muted); width: 72px; text-align: right; flex-shrink: 0; font-size: 11px; }
 </style>
 </head>
 <body>
@@ -369,6 +404,27 @@ HTML_TEMPLATE = r"""
         <div class="label">效率指数</div>
         <div class="value" id="productive-ratio">0%</div>
         <div class="sub">开发+办公+终端占比</div>
+      </div>
+    </div>
+
+    <!-- 效率评分 -->
+    <div class="card full-width" id="efficiency-card">
+      <h2><span class="icon">&#9889;</span> 今日效率评分</h2>
+      <div class="score-card">
+        <div class="score-ring-wrap">
+          <svg width="120" height="120" viewBox="0 0 120 120">
+            <circle class="score-ring-bg" cx="60" cy="60" r="52"/>
+            <circle class="score-ring-fill" id="score-ring-fill" cx="60" cy="60" r="52"
+              stroke-dasharray="326.73" stroke-dashoffset="326.73" stroke="var(--accent-blue)"/>
+          </svg>
+          <div class="score-center">
+            <div class="score-number" id="score-number" style="color:var(--accent-blue);">--</div>
+            <div class="score-grade" id="score-grade" style="color:var(--text-muted);">等待数据</div>
+          </div>
+        </div>
+        <div class="score-breakdown" id="score-breakdown">
+          <div style="color:var(--text-muted);font-size:13px;text-align:center;width:100%;padding:20px 0;">运行 tracker.py 采集数据后自动计算</div>
+        </div>
       </div>
     </div>
 
@@ -566,6 +622,7 @@ function renderStats(data) {
   renderHourlyChart(data.hourly_distribution);
   renderAppList(data.top_apps);
   renderFocusSection(data);
+  renderEfficiencyScore(data);
 }
 
 let categoryChart = null;
@@ -669,6 +726,50 @@ function renderFocusSection(data) {
   }
 }
 
+// ===== 效率评分渲染 =====
+function renderEfficiencyScore(stats) {
+  fetch('/api/efficiency-score').then(r => r.json()).then(data => {
+    const score = data.score || 0;
+    const grade = data.grade || 'N/A';
+    const breakdown = data.breakdown || {};
+    const circ = 52 * 2 * Math.PI; // 326.73
+
+    // 颜色映射
+    const gradeColors = { S: '#34d399', A: '#3b82f6', B: '#f59e0b', C: '#fb7185', D: '#ef4444', 'N/A': '#475569' };
+    const color = gradeColors[grade] || '#3b82f6';
+
+    // 环形
+    const ring = document.getElementById('score-ring-fill');
+    ring.style.strokeDashoffset = circ * (1 - score / 100);
+    ring.style.stroke = color;
+
+    // 数字
+    const numEl = document.getElementById('score-number');
+    numEl.textContent = score;
+    numEl.style.color = color;
+
+    // 等级
+    const gradeEl = document.getElementById('score-grade');
+    gradeEl.textContent = grade === 'N/A' ? '数据不足' : grade + ' 级';
+    gradeEl.style.color = color;
+
+    // 维度条
+    const bdEl = document.getElementById('score-breakdown');
+    const barColors = { '活跃率': '#34d399', '生产力占比': '#3b82f6', '按键强度': '#fb7185', '专注时段': '#f59e0b', '低干扰': '#a78bfa' };
+    if (Object.keys(breakdown).length === 0) return;
+    bdEl.innerHTML = Object.entries(breakdown).map(([name, info]) => {
+      if (name === 'note') return '';
+      const pct = Math.round((info.score / info.max) * 100);
+      const c = barColors[name] || '#3b82f6';
+      return '<div class="score-row">' +
+        '<span class="s-label">' + name + '</span>' +
+        '<div class="s-bar-bg"><div class="s-bar-fill" style="width:' + pct + '%;background:' + c + '"></div></div>' +
+        '<span class="s-pts">' + info.score + '/' + info.max + '</span>' +
+        '<span class="s-val">' + info.value + '</span></div>';
+    }).join('');
+  });
+}
+
 // ===== Ollama 状态 =====
 async function checkOllama() {
   const dot = document.getElementById('ollama-status');
@@ -703,7 +804,21 @@ async function runAnalysis() {
 
 // ===== 周趋势 =====
 async function loadWeeklyTrend() {
-  try { const resp = await fetch('/api/weekly-trend'); const data = await resp.json(); if (!data.error) renderWeeklyTrend(data); } catch(e) {}
+  try {
+    const [trendResp, scoreResp] = await Promise.all([
+      fetch('/api/weekly-trend'),
+      fetch('/api/efficiency-history?days=7')
+    ]);
+    const data = await trendResp.json();
+    const scores = await scoreResp.json();
+    if (!data.error) {
+      // 将评分数据映射到日期
+      const scoreMap = {};
+      scores.forEach(s => { scoreMap[s.date] = s.score; });
+      data.efficiency_scores = data.dates.map(d => scoreMap[d] || null);
+      renderWeeklyTrend(data);
+    }
+  } catch(e) {}
 }
 let weeklyTrendChart = null;
 function renderWeeklyTrend(data) {
@@ -713,14 +828,16 @@ function renderWeeklyTrend(data) {
   weeklyTrendChart = new Chart(ctx, {
     type: 'line', data: { labels, datasets: [
       { label: '活跃(分钟)', data: data.active_minutes, borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,0.08)', fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#34d399' },
-      { label: '按键强度(次/分)', data: data.kpm, borderColor: '#f472b6', backgroundColor: 'rgba(244,114,182,0.08)', fill: false, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#f472b6', yAxisID: 'y1' }
+      { label: '按键强度(次/分)', data: data.kpm, borderColor: '#f472b6', backgroundColor: 'rgba(244,114,182,0.08)', fill: false, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#f472b6', yAxisID: 'y1' },
+      { label: '效率评分', data: data.efficiency_scores || [], borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.05)', fill: false, tension: 0.3, pointRadius: 4, pointBackgroundColor: '#f59e0b', borderDash: [6, 3], yAxisID: 'y2', spanGaps: true }
     ]},
     options: { responsive: true, interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 }, usePointStyle: true } } },
+      plugins: { legend: { labels: { color: '#a8b4c8', font: { size: 11 }, usePointStyle: true } } },
       scales: {
-        x: { ticks: { color: '#475569' }, grid: { display: false } },
-        y: { ticks: { color: '#475569' }, grid: { color: 'rgba(59,130,246,0.06)' }, title: { display: true, text: '分钟', color: '#475569' } },
-        y1: { position: 'right', ticks: { color: '#475569' }, grid: { drawOnChartArea: false }, title: { display: true, text: '次/分', color: '#475569' } }
+        x: { ticks: { color: '#64748b' }, grid: { display: false } },
+        y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(59,130,246,0.06)' }, title: { display: true, text: '分钟', color: '#64748b' } },
+        y1: { position: 'right', ticks: { color: '#64748b' }, grid: { drawOnChartArea: false }, title: { display: true, text: '次/分', color: '#64748b' } },
+        y2: { position: 'right', ticks: { color: '#f59e0b' }, grid: { drawOnChartArea: false }, min: 0, max: 100, title: { display: true, text: '评分', color: '#f59e0b' }, display: false }
       }
     }
   });
@@ -819,6 +936,27 @@ def api_stats():
     records = get_today_activity()
     stats = compute_stats(records)
     return jsonify(stats)
+
+
+@app.route("/api/efficiency-score")
+def api_efficiency_score():
+    """计算并返回今日效率评分"""
+    from analyzer import get_today_activity
+    records = get_today_activity()
+    stats = compute_stats(records)
+    if "error" in stats:
+        return jsonify({"score": 0, "grade": "N/A", "breakdown": {}})
+    result = compute_efficiency_score(stats)
+    save_efficiency_score(stats)
+    return jsonify(result)
+
+
+@app.route("/api/efficiency-history")
+def api_efficiency_history():
+    """返回效率评分历史"""
+    days = int(request.args.get("days", 14))
+    history = get_efficiency_history(days)
+    return jsonify(history)
 
 
 @app.route("/api/analyze")

@@ -114,6 +114,137 @@ def compute_stats(records):
     }
 
 
+def compute_efficiency_score(stats):
+    """
+    计算每日综合效率评分 (0-100)
+
+    评分维度：
+    1. 活跃率 (0-20): 活跃时间占比
+    2. 生产力占比 (0-30): 开发/终端/办公/技术阅读/AI 工具占比
+    3. 按键强度 (0-20): 平均 KPM 反映深度工作程度
+    4. 专注连续性 (0-15): 高强度时段数量
+    5. 低干扰 (0-15): 娱乐/视频时间少
+    """
+    if "error" in stats:
+        return {"score": 0, "breakdown": {}, "grade": "N/A"}
+
+    total_min = stats.get("total_minutes", 0)
+    if total_min < 5:
+        return {"score": 0, "breakdown": {"note": "数据不足（<5分钟）"}, "grade": "N/A"}
+
+    breakdown = {}
+
+    # 1. 活跃率 (0-20)
+    active_ratio = stats.get("active_ratio", 0)
+    # 80%+ → 满分, 50% → 12分, 20% → 3分, 0% → 0
+    s1 = min(20, round(active_ratio / 80 * 20, 1))
+    breakdown["活跃率"] = {"value": f"{active_ratio}%", "score": s1, "max": 20}
+
+    # 2. 生产力占比 (0-30)
+    cat = stats.get("by_category", {})
+    productive_cats = ["development", "terminal", "office", "tech_reading", "ai_tool", "ai_chat"]
+    productive_min = sum(cat.get(c, 0) for c in productive_cats)
+    active_min = stats.get("active_minutes", 1) or 1
+    prod_ratio = productive_min / active_min * 100
+    # 80%+ → 30, 50% → 20, 20% → 8, 0% → 0
+    s2 = min(30, round(prod_ratio / 80 * 30, 1))
+    breakdown["生产力占比"] = {"value": f"{round(prod_ratio)}%", "score": s2, "max": 30}
+
+    # 3. 按键强度 (0-20)
+    kpm = stats.get("keys_per_minute", 0)
+    # 15+ KPM → 20 (深度编码), 8 → 12, 3 → 5, 0 → 0
+    s3 = min(20, round(kpm / 15 * 20, 1))
+    breakdown["按键强度"] = {"value": f"{kpm} 次/分", "score": s3, "max": 20}
+
+    # 4. 专注连续性 (0-15)
+    focus_hours = stats.get("focus_hours", [])
+    # 5+ 个高强度时段 → 15, 2 → 8, 0 → 0
+    s4 = min(15, round(len(focus_hours) / 5 * 15, 1))
+    breakdown["专注时段"] = {"value": f"{len(focus_hours)} 个", "score": s4, "max": 15}
+
+    # 5. 低干扰 (0-15) — 娱乐+视频占比越低分越高
+    waste_cats = ["entertainment", "video"]
+    waste_min = sum(cat.get(c, 0) for c in waste_cats)
+    waste_ratio = waste_min / active_min * 100
+    # 0% → 15, 10% → 12, 30% → 6, 60%+ → 0
+    s5 = max(0, round((1 - waste_ratio / 60) * 15, 1))
+    s5 = min(15, s5)
+    breakdown["低干扰"] = {"value": f"娱乐 {round(waste_ratio)}%", "score": s5, "max": 15}
+
+    total_score = round(sum(b["score"] for b in breakdown.values()), 0)
+
+    # 评级
+    if total_score >= 85:
+        grade = "S"
+    elif total_score >= 70:
+        grade = "A"
+    elif total_score >= 55:
+        grade = "B"
+    elif total_score >= 40:
+        grade = "C"
+    else:
+        grade = "D"
+
+    return {
+        "score": int(total_score),
+        "breakdown": breakdown,
+        "grade": grade,
+    }
+
+
+def save_efficiency_score(stats):
+    """计算并保存今日效率评分到数据库"""
+    result = compute_efficiency_score(stats)
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    conn = sqlite3.connect(str(DB_PATH))
+    # 确保表存在
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS efficiency_scores (
+            date TEXT PRIMARY KEY,
+            score INTEGER,
+            grade TEXT,
+            breakdown TEXT,
+            active_minutes REAL,
+            productive_ratio REAL,
+            kpm REAL,
+            focus_hours INTEGER,
+            created_at TEXT
+        )
+    """)
+    # Upsert
+    conn.execute("""
+        INSERT OR REPLACE INTO efficiency_scores (date, score, grade, breakdown, active_minutes, productive_ratio, kpm, focus_hours, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        today,
+        result["score"],
+        result["grade"],
+        json.dumps(result["breakdown"], ensure_ascii=False),
+        stats.get("active_minutes", 0),
+        stats.get("productive_ratio", 0) if "productive_ratio" in stats else 0,
+        stats.get("keys_per_minute", 0),
+        len(stats.get("focus_hours", [])),
+        datetime.now().isoformat(),
+    ))
+    conn.commit()
+    conn.close()
+    return result
+
+
+def get_efficiency_history(days=30):
+    """获取最近 N 天的效率评分历史"""
+    start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT date, score, grade, breakdown, active_minutes, kpm FROM efficiency_scores WHERE date >= ? ORDER BY date",
+        (start,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 def build_analysis_prompt(stats):
     """构建利用多维度数据的 AI Prompt"""
     prompt = f"""你是个人效率分析 AI 助手"DeskMind"。根据以下多维度电脑使用数据，给出深度分析和可执行建议。
